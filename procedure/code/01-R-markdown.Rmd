@@ -54,7 +54,7 @@ We will attemption to use the same methods and data sources as the original auth
 # record all the packages you are using here
 # this includes any calls to library(), require(),
 # and double colons such as here::i_am()
-packages <- c("tidyverse", "here", "sf", "tidycensus", "tmap")
+packages <- c("tidyverse", "here", "sf", "tidycensus", "tmap", "tigris")
 
 # force all conflicts to become errors
 # if you load dplyr and use filter(), R has to guess whether you mean dplyr::filter() or stats::filter()
@@ -72,7 +72,7 @@ if (!require(groundhog)) {
 
 # this date will be used to determine the versions of R and your packages
 # it is best practice to keep R and its packages up to date
-groundhog.day <- "2025-04-25"
+groundhog.day <- "2025-03-25"
 
 # this replaces any library() or require() calls
 groundhog.library(packages, groundhog.day)
@@ -127,6 +127,89 @@ Each of the next subsections describes one data source.
 - `Constraints`: Public data
 - `Data Quality`: trustworthy 
 
+```{r}
+variabels <- load_variables(year = 2017,
+               dataset = "acs5")
+```
+
+
+```{r}
+county_subdiv_file <- here("data", "raw", "public", "county_subdivision.gpkg")
+
+# if the data is already downloaded, just load it
+# otherwise, query from the census and save
+if (file.exists(county_subdiv_file)) {
+  ct_subdivs <- st_read(county_subdiv_file)
+} else {
+  # Define ACS variables
+  acs_vars <- c(
+    total_population = "B01003_001",
+    age_20m = "B01001_008",
+    age_21m = "B01001_009",
+    age_22_24m = "B01001_010",
+    age_25_29m = "B01001_011",
+    age_30_34m = "B01001_012",
+    age_20f = "B01001_032",
+    age_21f = "B01001_033",
+    age_22_24f = "B01001_034",
+    age_25_29f = "B01001_035",
+    age_30_34f = "B01001_036",
+    education_total = "B15003_001",
+    education_assoc = "B15003_021",
+    education_ba = "B15003_022",
+    education_ma = "B15003_023",
+    education_pro = "B15003_024",
+    education_phd = "B15003_025",
+    median_income = "B19013_001",
+    poverty_total_pop = "B17001_001",
+    poverty_below = "B17001_002",
+    unemployment_total = "B23025_001",
+    unemployment_total_in_labor = "B23025_002",
+    unemployment_unemployed = "B23025_005",
+    housing_total = "B25003_001",
+    housing_renter = "B25003_003",
+    housing_units_total = "B25024_001",
+    housing_units_2 = "B25024_004",
+    housing_units_3_4 = "B25024_005",
+    housing_units_5_9 = "B25024_006",
+    housing_units_10_19 = "B25024_007",
+    housing_units_20_49 = "B25024_008",
+    housing_units_50 = "B25024_009",
+    moved_total = "B07001_001",
+    moved_within_12_months = "B07001_017",
+    households_total = "B11003_001",
+    lone_parent_families_m = "B11003_010",
+    lone_parent_families_f = "B11003_016",
+    hispanic = "B03002_012",
+    race_white = "B03002_003",
+    race_black = "B03002_004",
+    race_asian = "B03002_006",
+    race_native = "B03002_005",
+    race_pacific = "B03002_007",
+    race_other = "B03002_008",
+    race_two_or_more = "B03002_009"
+  )
+
+  # Fetch ACS data
+  ct_subdivs <- get_acs(
+    geography = "county subdivision",
+    state = "Connecticut",
+    variables = acs_vars,
+    year = 2017,
+    survey = "acs5",
+    geometry = F,
+    output = "wide"
+  )
+
+  # Save the data
+  st_write(ct_subdivs, county_subdiv_file)
+  
+  #use tigris package cb = TRUE
+}
+
+```
+
+
 
 | Label | Alias | Definition | Type | Accuracy | Domain | Missing Data Value(s) | Missing Data Frequency |
 | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
@@ -154,7 +237,7 @@ Each of the next subsections describes one data source.
 
 ## Bias and threats to validity
 
-The thread specifically relevant to this problem is the Modifiable Unit Area Problem. There are also potential sources of error related to endogeneity and spatial autocorilation both of which are somewhat accounted for in the original study.
+The thread specifically relevant to this problem is the Modifiable Unit Area Problem. There are also potential sources of error related to endogeneity and spatial auto-correlation both of which are somewhat accounted for in the original study.
 
 These include:
   - uneven primary data collection due to geographic inaccessibility or other constraints
@@ -173,6 +256,11 @@ These include:
 ## Data transformations / analysis
 
 ![Workflow](`r here("docs", "CTcrimePlan.png")`)
+
+```{r}
+
+```
+
 
 # Results
 
