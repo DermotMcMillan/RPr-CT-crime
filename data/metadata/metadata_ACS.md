@@ -13,7 +13,7 @@
 - `Variables`: 
 | Label | Alias | Definition | Type | Accuracy | Domain | Missing Data Value(s) | Missing Data Frequency |
 | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
-| total_population| B01003_001 | Total US population (Estimate) | ... | ... | ... | ... | ... | 
+| total_population | B01003_001 | Total US population (Estimate) | ... | ... | ... | ... | ... | 
 | age_20m| B01001_008 | Population of Males aged 20 | ... | ... | ... | ... | ... | 
 | age_21m| B01001_009 | Population of Males aged 21 | ... | ... | ... | ... | ... |
 | age_22_24m| B01001_010 | Population of Males aged 22-24 | ... | ... | ... | ... | ... |
@@ -50,11 +50,11 @@
 | households_total| B11003_001 | Family Type by Presence and Age of Own Children Under 18 Years | ... | ... | ... | ... | ... |
 | lone_parent_families_m| B11003_010 | Male Housholder, no wife present | ... | ... | ... | ... | ... |
 | lone_parent_families_f| B11003_016 | Female housholder, no husband present | ... | ... | ... | ... | ... |
-| hispanic| B03002_012 | Hispanic | ... | ... | ... | ... |
-| race_white| B03002_003 | Not Hispanic or Latino, White alone | ... | ... | ... | ... |
-| race_black| B03002_003 | Not Hispanic or Latino, Black or African American alone | ... | ... | ... | ... |
-| race_asian| B03002_006 | Not Hispanic or Latino, Asian alone | ... | ... | ... | ... |
-| race_native| B03002_005 | Not Hispanic or Latino, American Indian and Alaska Native Alone | ... | ... | ... |
-| race_pacific| B03002_007 | Not Hispanic or Latino, Native Hawaiian and Other Pacific Islander Alone | ... | ... | ... |
-| race_other| B03002_008 | Not Hispanic or Latino, Some Other Race Alone | ... | ... | ... |
-| race_two_or_more| B03002_009 | Not Hispanic or Latino, Two or more races | ... | ... | ... |
+| hispanic| B03002_012 | Hispanic | ... | ... | ... | ... | ... |
+| race_white| B03002_003 | Not Hispanic or Latino, White alone | ... | ... | ... | ... | ... |
+| race_black| B03002_003 | Not Hispanic or Latino, Black or African American alone | ... | ... | ... | ... | ... |
+| race_asian| B03002_006 | Not Hispanic or Latino, Asian alone | ... | ... | ... | ... | ... |
+| race_native| B03002_005 | Not Hispanic or Latino, American Indian and Alaska Native Alone | ... | ... | ... | ... |
+| race_pacific| B03002_007 | Not Hispanic or Latino, Native Hawaiian and Other Pacific Islander Alone | ... | ... | ... | ... | ... |
+| race_other| B03002_008 | Not Hispanic or Latino, Some Other Race Alone | ... | ... | ... | ... | ... |
+| race_two_or_more| B03002_009 | Not Hispanic or Latino, Two or more races | ... | ... | ... | ... | ... |
