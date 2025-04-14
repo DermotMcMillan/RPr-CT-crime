@@ -42,9 +42,9 @@ This study is a *replication* of:
 
 This is a replication of a study on crime and contextual characteristics in Connecticut. The original study uses geographically weighted regression to test how crime rates at the county subdivision level vary based on several socio-demographic characteristics. 
 
-The original study is observational using sociodemographic indicators from the Census Bureau's American Community Survey 5-year estimates and crime data from the Uniform Crime Report disseminated by the Federal Bureau of Investigation.
+The original study is observational using socio-demographic indicators from the Census Bureau's American Community Survey 5-year estimates and crime data from the Uniform Crime Report disseminated by the Federal Bureau of Investigation.
 
-We will attemption to use the same methods and data sources as the original authors to see if there is any variation in our results or missing methods in their research.
+We will attempt to use the same methods and data sources as the original authors to see if there is any variation in our results or missing methods in their research.
 
 # Materials and procedure
 
@@ -103,14 +103,7 @@ knitr::opts_chunk$set(
 
 ## Data and variables
 
-Describe the **data sources** and **variables** to be used.
-Data sources may include plans for observing and recording **primary data** or descriptions of **secondary data**.
-For secondary data sources with numerous variables, the analysis plan authors may focus on documenting only the variables intended for use in the study.
-
-Primary data sources for the study are to include ... .
-Secondary data sources for the study are to include ... .
-
-Each of the next subsections describes one data source.
+There are two data sources for this study, one is demographic data from the American Community Survey and the other is crime rate statistics from the Uniform Crime Report gathered by the FBI. 
 
 ### Census County Subdivisions
 
@@ -197,7 +190,7 @@ if (file.exists(county_subdiv_file)) {
     variables = acs_vars,
     year = 2017,
     survey = "acs5",
-    geometry = F,
+    geometry = T,
     output = "wide"
   )
 
@@ -237,23 +230,11 @@ if (file.exists(county_subdiv_file)) {
 
 ## Bias and threats to validity
 
-The thread specifically relevant to this problem is the Modifiable Unit Area Problem. There are also potential sources of error related to endogeneity and spatial auto-correlation both of which are somewhat accounted for in the original study.
-
-These include:
-  - uneven primary data collection due to geographic inaccessibility or other constraints
-  - multiple hypothesis testing
-  - edge or boundary effects
-  - the modifiable areal unit problem
-  - nonstationarity
-  - spatial dependence or autocorrelation
-  - temporal dependence or autocorrelation
-  - spatial scale dependency
-  - spatial anisotropies
-  - confusion of spatial and a-spatial causation
-  - ecological fallacy
-  - uncertainty e.g. from spatial disaggregation, anonymization, differential privacy
+The thread specifically relevant to this problem is the Modifiable Unit Area Problem. There are also potential sources of error related to endogeneity and spatial auto-correlation both of which are somewhat accounted for in the original study. Additionally, the results do not have predictive power because the GWR is too regionally specific and over fit. Instead these results can be interpreted as exploratory requiring more rigorous research to contextualize and verify any findings. 
 
 ## Data transformations / analysis
+
+There are several methodological choices that the original authors did not specify, and which we will have to figure out by comparing results and summary statistics. Specifically, we need to choose a spatial weights matrix for the GWR. We will start with the default ArcGIS spatial matrii (since they used the ArcGIS tool for their analysis) and go from there. If we cannot figure out which one they used we will chose our own and compare results.
 
 ![Workflow](`r here("docs", "CTcrimePlan.png")`)
 
