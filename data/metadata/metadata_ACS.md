@@ -11,6 +11,7 @@
 - `Constraints`: Public data
 - `Data Quality`: trustworthy 
 - `Variables`: 
+
 | Label | Alias | Definition | Type | Accuracy | Domain | Missing Data Value(s) | Missing Data Frequency |
 | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
 | total_population | B01003_001 | Total US population (Estimate) | ... | ... | ... | ... | ... | 
