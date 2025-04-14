@@ -1,41 +1,29 @@
-If you use this template for research, please [cite it](template_reference.bib):
-> Kedron, P., & Holler, J. (2023). Template for Reproducible and Replicable Research in Human-Environment and Geographical Sciences. https://doi.org/10.17605/OSF.IO/W29MQ
-
 # Title of Study
-
+Replication of Meng 2021 Crime rates and contextual characteristics: A case study in Connecticut, USA
 ## Contributors
 
-- First Name Last Name\*, email address, @githubname, ORCID link, affiliated institution(s)
-- First Name Last Name, email address, @githubname, ORCID link, affiliated institution(s)
+- Dermot McMillan\*, dmcmillan@middlebury.edu, @DermotMcMillan, github.com/DermotMcMillan, Middlebury College
+- Gus Howard\*, ahoward@middlebury.edu, @gushoward, github.com/gushoward, Middlebury College
 
-\* Corresponding author and creator
 
 ## Abstract
 
-Write a brief abstract about your research project.
-If the project is a reproduction or replication study, include the full citation with a statement
-This study is a *reproduction/replication* of:
+The original paper aims to understand the relationship between contextual characteristics and violent and property crime statistics. The study analyzes ACS and UCR data using various spatial and statistical models.
+This study is a *replication* of:
 
-> citation to prior study
-
-A graphical abstract of the study could also be included as an image here.
+> Meng, Yunliang. 2021. Crime rates and contextual characteristics: A case study in connecticut, USA. Human Geographies 15, (2) (11): 209-228, https://www.proquest.com/scholarly-journals/crime-rates-contextual-characteristics-case-study/docview/2638089143/se-2 (accessed April 6, 2025).
 
 ## Study Metadata
 
-- `Key words`: Comma-separated list of keywords (tags) for searchability. Geographers often use one or two keywords each for: theory, geographic context, and methods.
-- `Subject`: select from the [BePress Taxonomy](http://digitalcommons.bepress.com/cgi/viewcontent.cgi?article=1008&context=reference)
-- `Date created`: date when project was started
-- `Date modified`: date of most recent revision
-- `Spatial Coverage`: Specify the geographic extent of your study. This may be a place name and link to a feature in a gazetteer like GeoNames or OpenStreetMap, or a well known text (WKT) representation of a bounding box.
-- `Spatial Resolution`: Specify the spatial resolution as a scale factor, description of the level of detail of each unit of observation (including administrative level of administrative areas), and/or or distance of a raster GRID size
-- `Spatial Reference System`: Specify the geographic or projected coordinate system for the study
-- `Temporal Coverage`: Specify the temporal extent of your study---i.e. the range of time represented by the data observations.
-- `Temporal Resolution`: Specify the temporal resolution of your study---i.e. the duration of time for which each observation represents or the revisit period for repeated observations
-- `Funding Name`: name of funding for the project
-- `Funding Title`: title of project grant
-- `Award info URI`: web address for award information
-- `Award number`: award number
-
+- `Key words`: Connecticut, crime, inequality, contextual characteristis
+- `Subject`: Social and Behavioral Sciences: Geography: Human Geography 
+- `Date created`: 04/06/2024
+- `Date modified`: "`r Sys.Date()`"
+- `Spatial Coverage`: Connecticut, USA
+- `Spatial Resolution`: County Subdivisions
+- `Spatial Reference System`: EPSG: 2234
+- `Temporal Coverage`: 2013 - 2017
+- `Temporal Resolution`: 1 year
 ## Related to
 
 - `OSF Project`:
@@ -64,7 +52,7 @@ This research compendium is structured with four main directories:
 - `results`: contains subdirectories for `figures`, formatted data `tables`, or `other` formats of research results.
 
 The data, procedures, and results of this repository are outlined in three tables:
-- Data: [data/data_index.csv](data/data_index.csv)
+- Data: [data/data_index.csv](data/data_index_crime.csv)
 - Procedures: [procedure/procedure_index.csv](procedure/procedure_index.csv)
 - Results: [results/results_index.csv](results/results_index.csv)
 
