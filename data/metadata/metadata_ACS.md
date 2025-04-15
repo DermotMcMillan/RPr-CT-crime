@@ -12,7 +12,7 @@
 - `Data Quality`: trustworthy 
 - `Variables`: 
 
-| Label | Alias | Definition | Type | Accuracy | Domain | Missing Data Value(s) | Missing Data Frequency |
+| Alias | Label | Definition | Type | Accuracy | Domain | Missing Data Value(s) | Missing Data Frequency |
 | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
 | total_population | B01003_001 | Total US population (Estimate) | ... | ... | ... | ... | ... | 
 | age_20m| B01001_008 | Population of Males aged 20 | ... | ... | ... | ... | ... | 
