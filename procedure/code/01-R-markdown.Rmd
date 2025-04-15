@@ -20,7 +20,7 @@ This study is a *replication* of:
 
 # Study metadata
 
-- `Key words`: Connecticuit, crime, inequality, conextual characteristics
+- `Key words`: Connecticut, crime, inequality, contextual characteristics
 - `Subject`: Social and Behavioral Sciences: Geography: Human Geography 
 - `Date created`: 04/06/2024
 - `Date modified`: "`r Sys.Date()`"
@@ -265,6 +265,11 @@ if (file.exists(county_subdiv_file)) {
 - `Distribution`: Publicly available
 - `Constraints`: Public data
 - `Data Quality`: good, reported from local law enforcement agencies
+
+```{r}
+crime_data <- read.csv(here("data", "raw", "public", "ct_crime_data.csv"))
+```
+
 
 
 ## Prior observations  
