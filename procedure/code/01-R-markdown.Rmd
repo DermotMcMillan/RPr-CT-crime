@@ -23,7 +23,7 @@ This study is a *replication* of:
 - `Key words`: Connecticut, crime, inequality, contextual characteristics
 - `Subject`: Social and Behavioral Sciences: Geography: Human Geography 
 - `Date created`: 04/06/2024
-- `Date modified`: "`r Sys.Date()`"
+- `Date modified`: `r Sys.Date()`
 - `Spatial Coverage`: Connecticut, USA
 - `Spatial Resolution`: County Subdivisions
 - `Spatial Reference System`: EPSG: 2234
@@ -278,11 +278,13 @@ crime_data <- read.csv(here("data", "raw", "public", "ct_crime_data.csv"))
 
 ## Bias and threats to validity
 
-The thread specifically relevant to this problem is the Modifiable Unit Area Problem. There are also potential sources of error related to endogeneity and spatial auto-correlation both of which are somewhat accounted for in the original study. Additionally, the results do not have predictive power because the GWR is too regionally specific and over fit. Instead these results can be interpreted as exploratory requiring more rigorous research to contextualize and verify any findings. 
+The threat specifically relevant to this problem is the Modifiable Unit Area Problem since crime rates will have different social and spatial patterns at different scales. There are also potential sources of error related to endogeneity and spatial auto-correlation both of which are moderately accounted for in the original study. Additionally, the results do not have predictive power because the GWR is too regionally specific and over fit. Instead these results can be interpreted as exploratory requiring more rigorous research to contextualize and verify any findings. Bias is also inherent to crime data since crime is socially constructed and criminality is at least partially defined around race and class in America. Over-policing and over-reporting in Low Income areas and Black and brown neighborhoods introduces bias into the measurement of crime itself.
 
 ## Data transformations / analysis
 
 There are several methodological choices that the original authors did not specify, and which we will have to figure out by comparing results and summary statistics. Specifically, we need to choose a spatial weights matrix for the GWR. We will start with the default ArcGIS spatial matrix (since they used the ArcGIS tool for their analysis) and go from there. If we cannot figure out which one they used we will chose our own and compare results. There are also some transformation choices with the census data that we will have to figure out by comparing our data to the summary statistics provided (i.e what denominator for percentages).
+
+Data transformations for Crime and Census data are provided in the following workflow:
 
 ![Workflow](`r here("docs", "CTcrimePlan.png")`)
 
@@ -295,9 +297,23 @@ There are several methodological choices that the original authors did not speci
 
 We will attempt to reproduce the graphics, model outputs and summary statistics provided in the study.
 
+Graphs/ figures we hope to reproduce:
+![Figure 2](`r here("docs", "original_study", "Figure2.png")`)
+![Figure 3](`r here("docs", "original_study", "Figure3.png")`)
+![Figure 4](`r here("docs", "original_study", "Figure4.png")`)
+![Figure 5](`r here("docs", "original_study", "Figure5.png")`)
+For this figure we hope to classify the beta value into bins where values around 0 are neutral and bins are equally spaced.
+![Figure 6](`r here("docs", "original_study", "Figure6.png")`)
+
+![Table 1](`r here("docs", "original_study", "Table1.png")`)
+![Table 2](`r here("docs", "original_study", "Table2.png")`)
+![Table 3](`r here("docs", "original_study", "Table3.png")`)
+![Table 4](`r here("docs", "original_study", "Table4.png")`)
+
+
 # Discussion
 
-There was no explicit research question. We will treat the results as exploratory and potentially do a spatial lag model to expand on the research. We also hope to caveat the results with qualitative context and offer some criticisms of predicting crime in general.
+There was no explicit research question. We will treat the results as exploratory and potentially do a spatial lag model to expand on the research. We also hope to caveat the results with qualitative context and offer some criticisms of predicting crime in general. For each of graphs and figures we hope to get very similar results but this will depend heavily on our ability to figure out the spatial weights matrix and data transformations used by the original authors.
 
 # Integrity Statement
 
