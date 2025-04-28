@@ -288,10 +288,27 @@ Data transformations for Crime and Census data are provided in the following wor
 
 ![Workflow](`r here("docs", "CTcrimePlan.png")`)
 
-```{r}
-
+```{r transform-crime-data}
+crime_data_final <- crime_data %>%
+  subset(Year %in% seq(2013,2017)) %>%
+  subset(Crime.Type %in% c("Total Violent Crime", "Total Property Crime")) %>%
+  subset(Measure.Type == "Rate (per 100,000)") %>%
+  subset(!(FIPS %in% c(9))) %>%
+  select(-X_full_text) %>%
+  group_by(Town, Crime.Type) %>%
+  mutate(Value = if_else(Value == 0, NA, Value)) %>%
+  summarize(rate_mean = mean(Value),
+            FIPS = max(FIPS))
 ```
 
+```{r summarize-crime-data}
+summary_crime <- crime_data_final %>%
+  group_by(Crime.Type) %>%
+  summarize(min = min(rate_mean, na.rm = T),
+            max = max(rate_mean, na.rm = T),
+            median = median(rate_mean, na.rm = T),
+            IQR = IQR(rate_mean, na.rm = T))
+```
 
 # Results
 
