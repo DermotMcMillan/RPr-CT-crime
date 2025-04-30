@@ -173,7 +173,8 @@ if (file.exists(county_subdiv_file)) {
     households_total = "B11003_001",
     lone_parent_families_m = "B11003_010",
     lone_parent_families_f = "B11003_016",
-    hispanic = "B03002_012",
+    race_total = "B03002_001",
+    race_hispanic = "B03002_012",
     race_white = "B03002_003",
     race_black = "B03002_004",
     race_asian = "B03002_006",
@@ -288,9 +289,66 @@ Data transformations for Crime and Census data are provided in the following wor
 
 ![Workflow](`r here("docs", "CTcrimePlan.png")`)
 
-```{r}
-
+```{r transform-crime-data}
+crime_data_final <- crime_data %>%
+  subset(Year %in% seq(2013,2017)) %>%
+  subset(Crime.Type %in% c("Total Violent Crime", "Total Property Crime")) %>%
+  subset(Measure.Type == "Rate (per 100,000)") %>%
+  subset(!(FIPS %in% c(9))) %>%
+  select(-X_full_text) %>%
+  group_by(Town, Crime.Type) %>%
+  summarize(rate_mean = mean(Value),
+            FIPS = max(FIPS)) %>%
+  pivot_wider(names_from = Crime.Type, values_from = rate_mean)
 ```
+
+```{r summarize-crime-data}
+summary_crime <- crime_data_final %>%
+  group_by(Crime.Type) %>%
+  summarize(min = min(rate_mean, na.rm = T),
+            max = max(rate_mean, na.rm = T),
+            median = median(rate_mean, na.rm = T),
+            IQR = IQR(rate_mean, na.rm = T))
+```
+
+```{r}
+ct_subdivs_calc <- ct_subdivs %>%
+  subset(total_populationE != 0) %>%
+  mutate(age = (age_20mE + age_20fE + age_21mE + age_21fE + age_22_24mE + age_22_24fE+ age_25_29mE + age_25_29fE + age_30_34mE + age_30_34fE)/total_populationE,
+         
+         education = (education_totalE - (education_baE + education_maE + education_proE + education_phdE))/ education_totalE,
+         
+         median_income = median_incomeE,
+         
+         unemployment_rate = unemployment_unemployedE/ unemployment_total_in_laborE,
+         
+         rent_rate = housing_renterE/ housing_totalE,
+         
+         multi_unit_rate = (housing_units_2E + housing_units_3_4E + housing_units_5_9E + housing_units_10_19E + housing_units_20_49E + housing_units_50E)/ housing_totalE,
+         
+         res_mobility = 1-(moved_within_12_monthsE/ moved_totalE),
+         
+         household_type = (lone_parent_families_mE + lone_parent_families_fE)/households_totalE) %>%
+  select(GEOID, NAME, age, education, median_income, unemployment_rate, rent_rate,multi_unit_rate, res_mobility, shannon_eq)
+```
+
+```{r}
+props <- ct_subdivs %>%
+  st_drop_geometry %>%
+  subset(total_populationE != 0) %>%
+  mutate(across(c(race_hispanicE, race_whiteE, race_blackE, race_asianE,
+                       race_nativeE, race_pacificE, race_otherE, race_two_or_moreE), ~-(.x / race_totalE) * log(.x / race_totalE))) %>%
+  select(race_hispanicE, race_whiteE, race_blackE, race_asianE,race_nativeE, race_pacificE, race_otherE, race_two_or_moreE) %>%
+  rowSums(na.rm = T) %>%
+  as.data.frame() %>%
+  mutate(shannon = props / log(8))
+```
+
+
+
+**Unplanned Deviation**
+It is clear, since the minimum values are different, that the author treated some empty or 0 values as nulls. Since we have no way of discerning which ones these were we will move forward by treating all empty values as 0.
+
 
 
 # Results
