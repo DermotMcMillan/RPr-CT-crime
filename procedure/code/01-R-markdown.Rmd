@@ -70,9 +70,10 @@ if (!require(groundhog)) {
   require(groundhog)
 }
 
+
 # this date will be used to determine the versions of R and your packages
 # it is best practice to keep R and its packages up to date
-groundhog.day <- "2025-03-25"
+groundhog.day <- "2025-04-22"
 
 # this replaces any library() or require() calls
 groundhog.library(packages, groundhog.day)
@@ -80,6 +81,7 @@ groundhog.library(packages, groundhog.day)
 # you may need to respond OK in the console to permit groundhog to install packages
 # you may need to restart R and rerun this code to load installed packages
 # In RStudio, restart r with Session -> Restart Session
+
 
 # record the R processing environment
 # alternatively, use devtools::session_info() for better results
@@ -169,6 +171,8 @@ if (file.exists(county_subdiv_file)) {
     housing_units_20_49 = "B25024_008",
     housing_units_50 = "B25024_009",
     moved_total = "B07001_001",
+    moved_within_county = "B07001_033",
+    moved_within_state = "B07001_049",
     moved_within_12_months = "B07001_017",
     households_total = "B11003_001",
     lone_parent_families_m = "B11003_010",
@@ -316,7 +320,7 @@ ct_subdivs_calc <- ct_subdivs %>%
   subset(total_populationE != 0) %>%
   mutate(age = (age_20mE + age_20fE + age_21mE + age_21fE + age_22_24mE + age_22_24fE+ age_25_29mE + age_25_29fE + age_30_34mE + age_30_34fE)/total_populationE,
          
-         education = (education_totalE - (education_baE + education_maE + education_proE + education_phdE))/ education_totalE,
+         education = (education_totalE - (education_assocE + education_baE + education_maE + education_proE + education_phdE))/ education_totalE,
          
          median_income = median_incomeE,
          
@@ -326,10 +330,10 @@ ct_subdivs_calc <- ct_subdivs %>%
          
          multi_unit_rate = (housing_units_2E + housing_units_3_4E + housing_units_5_9E + housing_units_10_19E + housing_units_20_49E + housing_units_50E)/ housing_totalE,
          
-         res_mobility = 1-(moved_within_12_monthsE/ moved_totalE),
+         res_mobility = (moved_within_countyE + moved_within_stateE)/ moved_totalE,
          
          household_type = (lone_parent_families_mE + lone_parent_families_fE)/households_totalE) %>%
-  select(GEOID, NAME, age, education, median_income, unemployment_rate, rent_rate,multi_unit_rate, res_mobility, shannon_eq)
+  select(GEOID, NAME, age, education, median_income, unemployment_rate, rent_rate,multi_unit_rate, res_mobility)
 ```
 
 ```{r}
@@ -348,6 +352,16 @@ props <- ct_subdivs %>%
 
 **Unplanned Deviation**
 It is clear, since the minimum values are different, that the author treated some empty or 0 values as nulls. Since we have no way of discerning which ones these were we will move forward by treating all empty values as 0.
+
+```{r}
+# Specify the columns of interest
+cols <- c("age", "education", "median_income", "unemployment_rate", "rent_rate", "multi_unit_rate", "res_mobility")
+
+ct_subdivs_calc %>% 
+  st_drop_geometry() %>%
+  summarise_at(cols, list(min = min, max = max, median = median), na.rm=T)
+
+```
 
 
 
