@@ -54,7 +54,7 @@ We will attempt to use the same methods and data sources as the original authors
 # record all the packages you are using here
 # this includes any calls to library(), require(),
 # and double colons such as here::i_am()
-packages <- c("tidyverse", "here", "sf", "tidycensus", "tmap", "tigris")
+packages <- c("tidyverse", "here", "sf", "tidycensus", "tmap", "tigris", "broom", "kableExtra")
 
 # force all conflicts to become errors
 # if you load dplyr and use filter(), R has to guess whether you mean dplyr::filter() or stats::filter()
@@ -73,7 +73,7 @@ if (!require(groundhog)) {
 
 # this date will be used to determine the versions of R and your packages
 # it is best practice to keep R and its packages up to date
-groundhog.day <- "2025-04-22"
+groundhog.day <- "2025-03-22"
 
 # this replaces any library() or require() calls
 groundhog.library(packages, groundhog.day)
@@ -332,8 +332,12 @@ ct_subdivs_calc <- ct_subdivs %>%
          
          res_mobility = (moved_within_countyE + moved_within_stateE)/ moved_totalE,
          
-         household_type = (lone_parent_families_mE + lone_parent_families_fE)/households_totalE) %>%
-  select(GEOID, NAME, age, education, median_income, unemployment_rate, rent_rate,multi_unit_rate, res_mobility)
+         household_type = (lone_parent_families_mE + lone_parent_families_fE)/households_totalE,
+         
+         pop_density = total_populationE/ st_area(geom),
+         GEOID = as.integer(GEOID)) %>%
+  
+  select(GEOID, NAME, age, education, median_income, unemployment_rate, rent_rate,multi_unit_rate, res_mobility, pop_density)
 ```
 
 ```{r}
@@ -360,9 +364,30 @@ cols <- c("age", "education", "median_income", "unemployment_rate", "rent_rate",
 ct_subdivs_calc %>% 
   st_drop_geometry() %>%
   summarise_at(cols, list(min = min, max = max, median = median), na.rm=T)
-
 ```
 
+```{r}
+data_final <- left_join(
+  ct_subdivs_calc,
+  crime_data_final,
+  by = join_by(GEOID == FIPS),
+  copy = FALSE,
+  suffix = c(".x", ".y"),
+  )
+```
+
+
+# Analysis
+
+```{r basic regression}
+ols_model <- lm(`Total Property Crime` ~ pop_density + multi_unit_rate,data = data_final)
+
+summary(ols_model) %>%
+  tidy() %>%    
+  mutate(p.value = ifelse(p.value < 0.0001, "<0.0001", round(p.value, 4))) %>%  
+  kbl(booktabs=TRUE, digits=2) %>%
+  column_spec(1, monospace = TRUE)
+```
 
 
 # Results
