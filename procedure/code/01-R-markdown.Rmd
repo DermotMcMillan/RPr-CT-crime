@@ -54,7 +54,7 @@ We will attempt to use the same methods and data sources as the original authors
 # record all the packages you are using here
 # this includes any calls to library(), require(),
 # and double colons such as here::i_am()
-packages <- c("tidyverse", "here", "sf", "tidycensus", "tmap", "tigris", "broom", "kableExtra")
+packages <- c("tidyverse", "here", "sf", "tidycensus", "tmap", "tigris", "broom", "kableExtra", "spdep", "spgwr", "rlang", "scales")
 
 # force all conflicts to become errors
 # if you load dplyr and use filter(), R has to guess whether you mean dplyr::filter() or stats::filter()
@@ -101,6 +101,9 @@ knitr::opts_chunk$set(
   fig.width = 8,
   fig.path = paste0(here("results", "figures"), "/")
 )
+# no scientific notation
+options(scipen = 999)
+options(digits = 2)
 ```
 
 ## Data and variables
@@ -128,7 +131,7 @@ variabels <- load_variables(year = 2017,
 ```
 
 
-```{r}
+```{r, echo = F}
 county_subdiv_file <- here("data", "raw", "public", "county_subdivision.gpkg")
 
 # if the data is already downloaded, just load it
@@ -275,12 +278,6 @@ if (file.exists(county_subdiv_file)) {
 crime_data <- read.csv(here("data", "raw", "public", "ct_crime_data.csv"))
 ```
 
-
-
-## Prior observations  
-
-
-
 ## Bias and threats to validity
 
 The threat specifically relevant to this problem is the Modifiable Unit Area Problem since crime rates will have different social and spatial patterns at different scales. There are also potential sources of error related to endogeneity and spatial auto-correlation both of which are moderately accounted for in the original study. Additionally, the results do not have predictive power because the GWR is too regionally specific and over fit. Instead these results can be interpreted as exploratory requiring more rigorous research to contextualize and verify any findings. Bias is also inherent to crime data since crime is socially constructed and criminality is at least partially defined around race and class in America. Over-policing and over-reporting in Low Income areas and Black and brown neighborhoods introduces bias into the measurement of crime itself.
@@ -293,7 +290,8 @@ Data transformations for Crime and Census data are provided in the following wor
 
 ![Workflow](`r here("docs", "CTcrimePlan.png")`)
 
-```{r transform-crime-data}
+```{r transform-crime-data, echo = F}
+#basic transformations to get data into wide format
 crime_data_final <- crime_data %>%
   subset(Year %in% seq(2013,2017)) %>%
   subset(Crime.Type %in% c("Total Violent Crime", "Total Property Crime")) %>%
@@ -306,67 +304,56 @@ crime_data_final <- crime_data %>%
   pivot_wider(names_from = Crime.Type, values_from = rate_mean)
 ```
 
-```{r summarize-crime-data}
-summary_crime <- crime_data_final %>%
-  group_by(Crime.Type) %>%
-  summarize(min = min(rate_mean, na.rm = T),
-            max = max(rate_mean, na.rm = T),
-            median = median(rate_mean, na.rm = T),
-            IQR = IQR(rate_mean, na.rm = T))
-```
-
-```{r}
+```{r calculate-variables}
 ct_subdivs_calc <- ct_subdivs %>%
   subset(total_populationE != 0) %>%
-  mutate(age = (age_20mE + age_20fE + age_21mE + age_21fE + age_22_24mE + age_22_24fE+ age_25_29mE + age_25_29fE + age_30_34mE + age_30_34fE)/total_populationE,
+  mutate(pop_density = as.numeric(total_populationE/ st_area(geom)) * 1000000,
+         age = (age_20mE + age_20fE + age_21mE + age_21fE + age_22_24mE + age_22_24fE+ age_25_29mE + age_25_29fE + age_30_34mE + age_30_34fE)/total_populationE * 100,
          
-         education = (education_totalE - (education_assocE + education_baE + education_maE + education_proE + education_phdE))/ education_totalE,
+         education = (education_totalE - (education_assocE + education_baE + education_maE + education_proE + education_phdE))/ education_totalE * 100,
          
          median_income = median_incomeE,
          
-         unemployment_rate = unemployment_unemployedE/ unemployment_total_in_laborE,
+         poverty_rate = poverty_belowE/ poverty_total_popE * 100,
          
-         rent_rate = housing_renterE/ housing_totalE,
+         unemployment_rate = unemployment_unemployedE/ unemployment_total_in_laborE * 100,
          
-         multi_unit_rate = (housing_units_2E + housing_units_3_4E + housing_units_5_9E + housing_units_10_19E + housing_units_20_49E + housing_units_50E)/ housing_totalE,
+         rent_rate = housing_renterE/ housing_totalE * 100,
          
-         res_mobility = (moved_within_countyE + moved_within_stateE)/ moved_totalE,
+         multi_unit_rate = (housing_units_2E + housing_units_3_4E + housing_units_5_9E + housing_units_10_19E + housing_units_20_49E + housing_units_50E)/ housing_totalE * 100,
          
-         household_type = (lone_parent_families_mE + lone_parent_families_fE)/households_totalE,
+         res_mobility = (moved_within_countyE + moved_within_stateE)/ moved_totalE * 100,
          
-         pop_density = total_populationE/ st_area(geom),
+         household_type = (lone_parent_families_mE + lone_parent_families_fE)/households_totalE * 100,
+         
          GEOID = as.integer(GEOID)) %>%
+##SHANNON
+  rowwise() %>%
+  mutate(
+    #calculate H
+    H = {
+      ps <- c_across(c(race_hispanicE, race_whiteE, race_blackE, race_asianE, race_nativeE, race_pacificE, race_otherE, race_two_or_moreE)) / race_totalE
+      ps <- ps[ps > 0] #remove 0s
+      -sum(ps * log(ps)) #sum of proportions x log(proportions)
+    },
+    #calculate Hmax
+    Hmax = log(8),
+    #calculate Shannon Equitability
+    shannon_eq = H / Hmax
+  ) %>%
+  ungroup() %>%
   
-  select(GEOID, NAME, age, education, median_income, unemployment_rate, rent_rate,multi_unit_rate, res_mobility, pop_density)
-```
-
-```{r}
-props <- ct_subdivs %>%
-  st_drop_geometry %>%
-  subset(total_populationE != 0) %>%
-  mutate(across(c(race_hispanicE, race_whiteE, race_blackE, race_asianE,
-                       race_nativeE, race_pacificE, race_otherE, race_two_or_moreE), ~-(.x / race_totalE) * log(.x / race_totalE))) %>%
-  select(race_hispanicE, race_whiteE, race_blackE, race_asianE,race_nativeE, race_pacificE, race_otherE, race_two_or_moreE) %>%
-  rowSums(na.rm = T) %>%
-  as.data.frame() %>%
-  mutate(shannon = props / log(8))
+  select(GEOID, NAME, age, poverty_rate, education, median_income, unemployment_rate, rent_rate,multi_unit_rate, res_mobility, pop_density, shannon_eq)
 ```
 
 
-
-**Unplanned Deviation**
-It is clear, since the minimum values are different, that the author treated some empty or 0 values as nulls. Since we have no way of discerning which ones these were we will move forward by treating all empty values as 0.
-
-```{r}
-# Specify the columns of interest
-cols <- c("age", "education", "median_income", "unemployment_rate", "rent_rate", "multi_unit_rate", "res_mobility")
-
-ct_subdivs_calc %>% 
-  st_drop_geometry() %>%
-  summarise_at(cols, list(min = min, max = max, median = median), na.rm=T)
+```{r map-shannon, eval = F}
+ggplot(data = data_final) +
+  geom_sf(aes(fill = shannon_eq))
 ```
 
-```{r}
+
+```{r merge-data}
 data_final <- left_join(
   ct_subdivs_calc,
   crime_data_final,
@@ -376,41 +363,577 @@ data_final <- left_join(
   )
 ```
 
-
 # Analysis
 
-```{r basic regression}
-ols_model <- lm(`Total Property Crime` ~ pop_density + multi_unit_rate,data = data_final)
+## Summary Stats
+
+```{r define-summary-function}
+summary_stats <- function(x) {
+  c(
+    Min = min(x),
+    Median = median(x),
+    Max = max(x),
+    IQR = IQR(x),
+    SD = sd(x)
+  )
+}
+```
+
+
+###Crime Data
+
+
+```{r summarize-crime-data}
+summary_crime <- crime_data_final %>%
+  ungroup() %>%
+  select(`Total Violent Crime`, `Total Property Crime`) %>%
+  map_df(summary_stats, .id = "Statistic")
+
+summary_crime %>% 
+  kbl(digits = 1) %>%
+  kable_styling()
+```
+
+![Table 1](`r here("docs", "original_study", "Table1.png")`)
+
+**Unplanned Deviation**
+It is clear, since the minimum values are different, that the author treated some empty or 0 values as nulls. Since we have no way of discerning which ones these were we will move forward by treating all empty values as 0.
+
+#### Visualize Crime
+
+```{r visualize-property-crime}
+data_final %>% ggplot() +
+  geom_sf(aes(fill = `Total Property Crime`)) +
+  labs(title = "Property Crime Rate",
+       fill = "crimes per 100,000")
+```
+
+
+```{r visualize-violent-crime}
+data_final %>% ggplot() +
+  geom_sf(aes(fill = `Total Violent Crime`)) +
+  labs(title = "Violent Crime Rate",
+       fill = "crimes per 100,000")
+```
+
+
+###Census
+
+
+```{r summarize-census-data}
+summary_census <- ct_subdivs_calc %>%
+  ungroup() %>%
+  st_drop_geometry() %>%
+  select(!c(GEOID, NAME)) %>%
+  map_df(summary_stats, .id = "Statistic")
+
+summary_census %>%
+  kbl(digits = 2) %>%
+  kable_styling()
+```
+
+![Table 2](`r here("docs", "original_study", "Table2.png")`)
+
+***Unplanned Deviation***
+Variables were calculated using each tables respective total population. We cross compared using the summary table (table 2), and were able to match most of the values. Population density, housing type (multi_unit_rate), and residential mobility calculations yielded slightly different results. For population density, this is likely because of minor differences sin calculating area. For housing type and residential mobility, we were unable to parse the differences. Discrepancies may be because the original authors cleaned the data and didn't report it. 
+
+
+The Shannon index we calculated reported very different summary statistics compared to the original study. Initially, we thought this was a calculation error but we re-ran the analysis several ways (hand-built method and ChatGPT generated workflow) and got the same results. To further verify, I compared the spatial distribution of the Shannon index to maps of other diversity measures in CT and they were almost identical. This, along with some concerning deviations in our analysis, lead us to believe that the original authors incorrectly calculated the metric.
+
+## Basic Regression
+
+
+###Property Crime
+
+
+```{r basic-regression-property}
+ols_model <- lm(`Total Property Crime` ~ pop_density + multi_unit_rate, data = data_final)
 
 summary(ols_model) %>%
   tidy() %>%    
   mutate(p.value = ifelse(p.value < 0.0001, "<0.0001", round(p.value, 4))) %>%  
-  kbl(booktabs=TRUE, digits=2) %>%
-  column_spec(1, monospace = TRUE)
+  kbl(booktabs = TRUE, digits=2) %>%
+  kable_styling()
 ```
 
 
-# Results
+###Violent Crime
 
-We will attempt to reproduce the graphics, model outputs and summary statistics provided in the study.
 
-Graphs/ figures we hope to reproduce:
+```{r basic-regression-violent}
+ols_model <- lm(`Total Violent Crime` ~ pop_density + education + poverty_rate + shannon_eq, data = data_final)
+
+summary(ols_model) %>%
+  tidy() %>%    
+  mutate(p.value = ifelse(p.value < 0.0001, "<0.0001", round(p.value, 4))) %>%  
+  kbl(booktabs = TRUE, digits=2) %>%
+  kable_styling()
+```
+
+![Table 3](`r here("docs", "original_study", "Table3.png")`)
+
+The ordinary least squares regression results with `Total Property Crime` (really the crime rate per 100,000) as the response variable gave surprisingly similar results to the original OLS model in the study. The beta estimates were slightly different for both the predictor values, but this makes sense given that all 3 of the variables had minor discrepancies. We only used the predictor variables selected by the original authors. To expand in this section (and explore the tree of forking paths), it may make sense to do a variable selection process with our data too see if we may have chosen different predictors.
+
+The OLS coefficients for `Total Violent Crime`  were all similar to the original study except for the Shannon equability index (diversity), which didn't even provide a significant result. 
+
+## Moran's I
+
+In this section we only visualized the Local Moran's I values, we did not calculate a Global Moran's I for times sake.
+
+```{r make-sure-data-is-projected}
+data_final <- st_transform(data_final, 26956)
+```
+
+```{r calculate-weight, echo = F, warning = F}
+# Get centroids
+coords <- st_coordinates(st_centroid(data_final))
+
+# Calculate k=1 nearest neighbor distances
+knn_1 <- knearneigh(coords, k = 1)
+nb_knn_1 <- knn2nb(knn_1)
+max_dist <- max(unlist(nbdists(nb_knn_1, coords)))
+
+# Build distance-based neighbors using that max_dist
+dist_neighbors <- dnearneigh(coords, 0, max_dist)
+
+# Create spatial weights matrix
+weights <- nb2listw(dist_neighbors, style = "W", zero.policy = TRUE)
+```
+
+***Planned Deviation***
+We had no idea what spatial weights matrix the original author used to calculate local Moran's I scores so we went with what seems to be the default in ArcGIS: fixed distance based on the maximum of the nearest neighbor distances.
+
+```{r calculate-morans-I, echo = F, warning = F}
+# Local Moran's I for Violent Crime
+local_moran_violent <- localmoran(data_final$`Total Violent Crime`, weights)
+
+# Local Moran's I for Property Crime
+local_moran_property <- localmoran(data_final$`Total Property Crime`, weights)
+```
+
+```{r join-morans-I}
+data_final <- data_final %>%
+  mutate(
+    moran_I_violent = local_moran_violent[, "Ii"],
+    moran_p_violent = local_moran_violent[, "Pr(z != E(Ii))"],
+    moran_I_property = local_moran_property[, "Ii"],
+    moran_p_property = local_moran_property[, "Pr(z != E(Ii))"]
+  )
+```
+
+```{r cluster-classification-function}
+get_clusters <- function(crime_var, moran_result) {
+  crime_z <- scale(crime_var)[, 1]
+  lag_crime <- lag.listw(weights, crime_var)
+  lag_crime_z <- scale(lag_crime)[, 1]
+  pval <- moran_result[, "Pr(z != E(Ii))"]
+  
+  case_when(
+    pval > 0.05 ~ "Not significant",
+    crime_z > 0 & lag_crime_z > 0 ~ "High-High",
+    crime_z < 0 & lag_crime_z < 0 ~ "Low-Low",
+    crime_z > 0 & lag_crime_z < 0 ~ "High-Low",
+    crime_z < 0 & lag_crime_z > 0 ~ "Low-High",
+    TRUE ~ "Unclassified"
+  )
+}
+```
+
+***Ulanned Deviation***
+It was difficult to determine the exact classification scheme used in ArcGIS for the cluster analysis, as the GUI offers multiple options and limited transparency. After researching the default settings and discussing with ChatGPT, we concluded that areas with statistically significant Local Moran's I results were classified based on whether their own crime rate and the spatial lag (the average crime rate of neighboring areas) were above or below the global mean. This combination allowed us to assign clusters such as High-High, Low-Low, High-Low, and Low-High.
+
+```{r add-clusters-to-data}
+data_final <- data_final %>%
+  mutate(
+    cluster_violent = get_clusters(`Total Violent Crime`, local_moran_violent),
+    cluster_property = get_clusters(`Total Property Crime`, local_moran_property)
+  )
+```
+
+```{r visualize-local-morans}
+data_final %>%
+  select(GEOID, NAME, geom, cluster_violent, cluster_property) %>%
+  pivot_longer(cols = starts_with("cluster_"), names_to = "crime_type", values_to = "cluster") %>%
+  mutate(crime_type = recode(crime_type,
+                             cluster_violent = "Violent Crime",
+                             cluster_property = "Property Crime")) %>% ggplot() +
+  geom_sf(aes(fill = cluster), color = "white", size = 0.2) +
+  scale_fill_manual(values = c(
+    "High-High" = "red",
+    "Low-Low" = "blue",
+    "High-Low" = "pink",
+    "Low-High" = "lightblue",
+    "Not significant" = "gray80"
+  )) +
+  facet_wrap(~crime_type) +
+  labs(
+    title = "Local Moran's I Clusters of Crime in Connecticut",
+    fill = "Cluster Type"
+  ) +
+  theme_minimal() +
+  theme(strip.text = element_text(size = 14))
+
+```
+
 ![Figure 2](`r here("docs", "original_study", "Figure2.png")`)
+
+##GWR
+
+```{r GWR, echo = F, warning = F, message = FALSE}
+#convert to SP object
+ct_subdivs_sp <- as(data_final, "Spatial")
+
+#define Formulas
+gwr_property_formula <- Total.Property.Crime ~ pop_density + multi_unit_rate
+
+gwr_violent_formula <- Total.Violent.Crime ~ pop_density + education + poverty_rate + shannon_eq
+
+##PROPERTY
+#use AIC minimization to select an adaptive bandwidth
+gwr_bandwidth_property <- gwr.sel(
+  formula = gwr_property_formula,
+  data = ct_subdivs_sp,
+  adapt = TRUE,
+  gweight = gwr.bisquare
+)
+
+#run models
+gwr_property <- gwr(
+  formula = gwr_property_formula,
+  data = ct_subdivs_sp,
+  adapt = gwr_bandwidth_property,
+  gweight = gwr.bisquare,
+  hatmatrix = TRUE,
+  se.fit = TRUE
+)
+
+##VIOLENT
+#use AIC minimization to select an adaptive bandwidth
+gwr_bandwidth_violent <- gwr.sel(
+  formula = gwr_violent_formula,
+  data = ct_subdivs_sp,
+  adapt = TRUE,
+  gweight = gwr.bisquare
+)
+
+#run models
+gwr_violent <- gwr(
+  formula = gwr_violent_formula,
+  data = ct_subdivs_sp,
+  adapt = gwr_bandwidth_violent,
+  gweight = gwr.bisquare,
+  hatmatrix = TRUE,
+  se.fit = TRUE
+)
+```
+
+
+We used the same method as the original author to chose an adaptive bandwith based on AIC minimization. We did not have to specify a spatial weights matrix for he GWR like we thought.
+
+
+```{r join-model}
+ct_subdivs_sp@data <- cbind(ct_subdivs_sp@data, gwr_property$SDF@data)
+ct_subdivs_sp@data <- cbind(ct_subdivs_sp@data, gwr_violent$SDF@data)
+```
+
+```{r convert-back-to-sf}
+ct_subdivs_sf_gwr <- st_as_sf(ct_subdivs_sp)
+```
+
+```{r calculate-t-values}
+ct_subdivs_sf_gwr <- ct_subdivs_sf_gwr %>%
+  mutate(t_pop_density = pop_density.1 / pop_density_se,
+         t_multi_unit_rate = multi_unit_rate.1 / multi_unit_rate_se,
+         t_pop_density2 = pop_density.2 / pop_density_se.1,
+         t_education = education.1 / education_se,
+         t_poverty = poverty_rate.1 / poverty_rate_se,
+         t_shannon_eq = shannon_eq.1 / shannon_eq_se)
+```
+
+```{r define-pallette}
+cols <- c("#4374b3","#a2b4bb","#fbfec0","#f29767","#d42d24")
+cols2 <-c("#343434","#686868","#b2b2b2","#686868","#343434")
+```
+
+```{r coefficient-breaks-function}
+coefficient_breaks <- function(data, varname, breaks = quantile(var_vals, probs = seq(0, 1, 0.2), na.rm = TRUE)) {
+  #pull actual numeric vector for binning
+  var_vals <- data %>% pull(!!varname)
+  
+  #create formatted labels
+  labels <- paste0(
+    number(breaks[-length(breaks)], accuracy = 0.01),
+    " - ",
+    number(breaks[-1], accuracy = 0.01)
+  )
+  
+  #create new column name
+  bin_var <- paste0(as_string(varname), "_bin")
+  
+  #add binned column to dataframe
+  data %>%
+    mutate(
+      !!bin_var := cut(
+        var_vals,
+        breaks = unname(breaks),
+        labels = labels,
+        include.lowest = TRUE
+      ),
+      !!bin_var := factor(!!sym(bin_var), levels = labels)
+    )
+}
+```
+
+```{r bin-data}
+#define coefficient columns to bin
+coef_to_bin <- c("pop_density.1",
+                 "multi_unit_rate.1",
+                 "localR2",
+                 "pop_density.2",
+                 "education.1",
+                 "poverty_rate.1",
+                 "shannon_eq.1",
+                 "localR2.1")
+
+for (col in coef_to_bin) {
+  ct_subdivs_sf_gwr <- coefficient_breaks(ct_subdivs_sf_gwr, col)
+}
+
+#define 3 binned t-value columns
+t_to_bin <- c("t_pop_density",
+              "t_multi_unit_rate",
+              "t_pop_density2",
+              "t_poverty",
+              "t_education",
+              "t_shannon_eq")
+
+for (col in t_to_bin) {
+  ct_subdivs_sf_gwr <- coefficient_breaks(ct_subdivs_sf_gwr, col, breaks = c(-10,-2.58,-1.96,1.96,2.58,10))
+}
+```
+
+
+###Summary
+
+
+```{r}
+gwr_summary <- function(x) {
+  c(
+    Min = min(x, na.rm = T),
+    Max = max(x, na.rm = T)
+  )
+}
+```
+
+```{r print-results}
+summary_gwr <- ct_subdivs_sf_gwr %>%
+  st_drop_geometry() %>%
+  select(pop_density.1,
+         multi_unit_rate.1,
+         pop_density.2,
+         education.1,
+         poverty_rate.1,
+         shannon_eq.1) %>%
+  map_df(gwr_summary, .id = "Statistic")
+```
+
+
+```{r print-results2}
+t_pop1 <- table(ct_subdivs_sf_gwr$t_pop_density_bin)
+t_hous <- table(ct_subdivs_sf_gwr$t_multi_unit_rate_bin)
+t_pop2 <- table(ct_subdivs_sf_gwr$t_pop_density2_bin)
+t_pov <- table(ct_subdivs_sf_gwr$t_poverty_bin)
+t_edu <- table(ct_subdivs_sf_gwr$t_education_bin)
+t_div <- table(ct_subdivs_sf_gwr$t_shannon_eq_bin)
+
+under_1.96 <- c(unname(t_edu[3])/ sum(t_edu),
+                unname(t_hous[3])/ sum(t_hous),
+                unname(t_pop2[3])/ sum(t_pop2),
+                unname(t_pov[3])/ sum(t_pov),
+                unname(t_edu[3])/ sum(t_edu),
+                unname(t_div[3])/ sum(t_div))
+
+between_1.96_2.58 <- c(unname(t_pop1[1]+t_pop1[5]) / sum(t_pop1),
+                       unname(t_hous[1]+t_hous[5]) / sum(t_hous),
+                       unname(t_pop2[1]+t_pop2[5]) / sum(t_pop2),
+                       unname(t_pov[1]+t_pov[5]) / sum(t_pov),
+                       unname(t_edu[1]+t_edu[5]) / sum(t_edu),
+                       unname(t_div[1]+t_div[5]) / sum(t_div))
+
+above_2.58 <- c(unname(t_pop1[2]+t_pop1[4]) / sum(t_pop1),
+                unname(t_hous[2]+t_hous[4]) / sum(t_hous),
+                unname(t_pop2[2]+t_pop2[4]) / sum(t_pop2),
+                unname(t_pov[2]+t_pov[4]) / sum(t_pov),
+                unname(t_edu[2]+t_edu[4]) / sum(t_edu),
+                unname(t_div[2]+t_div[4]) / sum(t_div))
+
+summary_gwr$under_1.96 <- under_1.96
+summary_gwr$between_1.96_2.58 <- between_1.96_2.58
+summary_gwr$above_2.58 <- above_2.58
+
+rm(under_1.96, between_1.96_2.58, above_2.58,t_pop1, t_hous, t_pop2, t_pov, t_edu, t_div)
+```
+
+```{r print-results3}
+summary_gwr %>%
+  kbl(digits = 2) %>%
+  kable_styling()
+```
+
+![Table 4](`r here("docs", "original_study", "Table4.png")`)
+
+
+Coefficient ranges for each of the models (Property/ Violent Crime) varried significantly between the original study and our reproduction. This difference can be explained by the discrepancies in the underlying data and the fact that GWR over fits (explains too much of the error).
+
+
+
+### Property Crime Model Visualized
+
+```{r map-results-pop-density-coef}
+ggplot(data = ct_subdivs_sf_gwr) +
+  geom_sf(aes(fill = pop_density.1_bin)) +
+  scale_fill_manual(values = cols, name = "Coefficient Bin") +
+  theme_minimal() +
+  labs(title = "β Estimate for Population Density")
+```
+
+```{r map-results-multi-unit-rate-coef}
+ggplot(data = ct_subdivs_sf_gwr) +
+  geom_sf(aes(fill = multi_unit_rate.1_bin)) +
+  scale_fill_manual(values = cols, name = "Coefficient Bin") +
+  theme_minimal() +
+  labs(title = "β Estimate for Type of Housing")
+```
+
+```{r map-results-R^2-property}
+ggplot(data = ct_subdivs_sf_gwr) +
+  geom_sf(aes(fill = localR2_bin)) +
+  scale_fill_manual(values = cols, name = "Coefficient Bin") +
+  theme_minimal() +
+  labs(title = "Local Adjusted R Squared Value for Property Crime Rates")
+```
+
 ![Figure 3](`r here("docs", "original_study", "Figure3.png")`)
+
+```{r map-results-t-pop-densiy}
+ggplot(data = ct_subdivs_sf_gwr) +
+  geom_sf(aes(fill = t_pop_density_bin)) +
+  scale_fill_manual(values = cols2[-c(1,2)], name = "t-value Bin") +
+  theme_minimal() +
+  labs(title = "t Values for Population Density")
+```
+
+```{r map-results-t-housing-type}
+ggplot(data = ct_subdivs_sf_gwr) +
+  geom_sf(aes(fill = t_multi_unit_rate_bin)) +
+  scale_fill_manual(values = cols2[-c(1,2)], name = "t-value Bin") +
+  theme_minimal() +
+  labs(title = "t Values for Type of Housing")
+```
 ![Figure 4](`r here("docs", "original_study", "Figure4.png")`)
+
+### Violent Crime Model Visualized
+
+```{r map-results-pop-density-coef2}
+ggplot(data = ct_subdivs_sf_gwr) +
+  geom_sf(aes(fill = pop_density.2_bin)) +
+  scale_fill_manual(values = cols, name = "Coefficient Bin") +
+  theme_minimal() +
+  labs(title = "β Estimate for Population Density")
+```
+
+```{r map-results-education-coef}
+ggplot(data = ct_subdivs_sf_gwr) +
+  geom_sf(aes(fill = education.1_bin)) +
+  scale_fill_manual(values = cols, name = "Coefficient Bin") +
+  theme_minimal() +
+  labs(title = "β Estimate for Education")
+```
+
+```{r map-results-poverty-coef}
+ggplot(data = ct_subdivs_sf_gwr) +
+  geom_sf(aes(fill = poverty_rate.1_bin)) +
+  scale_fill_manual(values = cols, name = "Coefficient Bin") +
+  theme_minimal() +
+  labs(title = "β Estimate for Poverty")
+```
+
+```{r map-results-shannon-eq-coef}
+ggplot(data = ct_subdivs_sf_gwr) +
+  geom_sf(aes(fill = shannon_eq.1_bin)) +
+  scale_fill_manual(values = cols, name = "Coefficient Bin") +
+  theme_minimal() +
+  labs(title = "β Estimate for Racial/Ethnic Diversity")
+```
+
+```{r map-results-R^2-property2}
+ggplot(data = ct_subdivs_sf_gwr) +
+  geom_sf(aes(fill = localR2.1_bin)) +
+  scale_fill_manual(values = cols, name = "Coefficient Bin") +
+  theme_minimal() +
+  labs(title = "Local Adjusted R Squared Value for Violent Crime Rates")
+```
+
 ![Figure 5](`r here("docs", "original_study", "Figure5.png")`)
-For this figure we hope to classify the beta value into bins where values around 0 are neutral and bins are equally spaced.
+
+```{r map-results-t-pop-densiy2}
+ggplot(data = ct_subdivs_sf_gwr) +
+  geom_sf(aes(fill = t_pop_density2_bin)) +
+  scale_fill_manual(values = cols2[-c(1,2)], name = "t-value Bin") +
+  theme_minimal() +
+  labs(title = "t Values for Population Density")
+```
+
+```{r map-results-t-education}
+ggplot(data = ct_subdivs_sf_gwr) +
+  geom_sf(aes(fill = t_education_bin)) +
+  scale_fill_manual(values = cols2, name = "t-value Bin") +
+  theme_minimal() +
+  labs(title = "t Values for Education")
+```
+
+```{r map-results-t-poverty}
+ggplot(data = ct_subdivs_sf_gwr) +
+  geom_sf(aes(fill = t_poverty_bin)) +
+  scale_fill_manual(values = cols2[-c(1,2)], name = "t-value Bin") +
+  theme_minimal() +
+  labs(title = "t Values for Poverty")
+```
+
+```{r map-results-t-shannon}
+ggplot(data = ct_subdivs_sf_gwr) +
+  geom_sf(aes(fill = t_shannon_eq_bin)) +
+  scale_fill_manual(values = cols2, name = "t-value Bin") +
+  theme_minimal() +
+  labs(title = "t Values for Racial/Ethnic Diversity")
+```
 ![Figure 6](`r here("docs", "original_study", "Figure6.png")`)
 
-![Table 1](`r here("docs", "original_study", "Table1.png")`)
-![Table 2](`r here("docs", "original_study", "Table2.png")`)
-![Table 3](`r here("docs", "original_study", "Table3.png")`)
-![Table 4](`r here("docs", "original_study", "Table4.png")`)
+# Results
+
+For Each set of GWR maps, we visualized the coefficients based on quartile bins (same method as authors). This is not a particularly helpful way of visualizing coefficients, especially if using a diverging color scheme, since the sign of the coefficient has meaning and is misrepresented when the central color is not 0. We created a function for binning so that anyone who wishes to work further on this can easily change the visual representation of the data but did not implement a more statistically accurate color scheme. Despite this, many of the maps did maintain a similar spatial distribution of high and low coefficients (with respect to the mean) as compared to the original study. Some of the patterns, though, such as the distribution in the coefficients for the Shannon Equability Index were wildly different. This is pretty concerning, given the original author made some problematic and unfounded claims (based on these results) about the role of diversity in fostering crime.
+
+Also, the spatial variation in t-scores was completely different. This makes sense given the ranges of coefficients were much different so the counties with beta values near zero changed between the studies. The only predictor (for both models) with significant results across the board was population density.
+
+The truth is GWR and Moran's I testing do not have much predictive power so many of the claims made by the author are unreasonable given the evidence. The only thing that can tell us is that there is or is not spatial variation in the relationship between the response and predictor variables, which our replication also shoes.
 
 
 # Discussion
 
-There was no explicit research question. We will treat the results as exploratory and potentially do a spatial lag model to expand on the research. We also hope to caveat the results with qualitative context and offer some criticisms of predicting crime in general. For each of graphs and figures we hope to get very similar results but this will depend heavily on our ability to figure out the spatial weights matrix and data transformations used by the original authors.
+Whilst replicating this study, we came across a number of deviations that we had to make, as well as some limitations and issues with the original study. One limitation in the conceptualization of this study lies in its reliance on predefined administrative boundaries, such as county subdivisions, which may not accurately reflect the social and environmental contexts influencing crime. This approach can lead to the Modifiable Areal Unit Problem (MAUP), where statistical results vary based on the spatial units used, potentially obscuring localized crime patterns and leading to ecological fallacies when inferring individual behaviors from aggregate data. 
+
+
+The study’s use of the Shannon Index — an ecological species diversity measure — as a metric for human diversity and how this impacts crime rates is especially problematic and misleading. When using the Shannon Index, diversity levels are considered as the level of evenness across eight racial groups, which does not represent true diversity, especially when analyzing a smaller geographic area such as Connecticut. Also, the assumptions made on the back of the Shannon index numbers are troubling. The study writes: “racial/ethnic heterogeneity weakens residents’ attachment to the areas where they live and reduces community organization and involvement”. The implication that community engagement is greater in less diverse communities is unfounded given both the original and replication study results, which showed coefficients ranging across space from both positive to negative. This implies that some geographically determined exogenous effect is more impact than diversity on crime rates. This is an especially unfounded claim given that beta values for this variable were not significant in both the OLS model and the GWR (save for a few counties). Additionally, the study's focus on certain socioeconomic variables may overlook other influential factors like cultural dynamics, community cohesion, or informal social controls that are harder to quantify but significantly impact crime rates. 
+
+
+Regarding the measurement of crime, the UCR crime data is reported by county subdivision which may result in variations in law enforcement practices, reporting standards, and resource allocation across these jurisdictions. The result may be inconsistencies in crime data, complicating comparisons and trend analyses. Studies like this can influence policy decisions, potentially amplifying the effect of these inconsistencies. There is also always error and bias built into crime data since law enforcement historically over-polices and reports on marginalized groups — specifically Black Americans. In crime research this can create a sort of self fulfilling prophecy where over-reporting reinforces police bias, and that bias fuels over-reporting.
+
+
+ACS has large margins of error for each statistic so when dealing with smaller, less populous geographic areas like Connecticut, these margins are often quite high. When these data are used as predictors in regression models or spatial analyses, the underlying uncertainty can lead to unstable or misleading results. This is part of a larger problem that we faced in our replication study, which is the original study’s lack of clarity regarding their choices in variables, models, and more. We have experienced a significant number of deviations in the data - and although they may be minor, these differences compound to create large gaps in the models and our ability to replicate the original study’s models. 
+
+
+The author importantly notes that discussions of crime should be more locally focused and context specific. Policy and policing of crime should reflect this context and the natural spatial variation of all forms of crime. The data and models used in the study show that there is spatial variation in the data but the models have little to no predictive power thus conclusions regarding the effect of diversity on crime and social capital, for example, should not be given too much weight. Further work and analysis needs to be done beyond the geographic weighted regression to apply conclusions to these relationships.
+
 
 # Integrity Statement
 
